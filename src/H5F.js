@@ -20,7 +20,7 @@
         emailPatt = /^[a-zA-Z0-9.!#$%&'*+-\/=?\^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/,
         urlPatt = /[a-z][\-\.+a-z]*:\/\//i,
         nodes = /^(input|select|textarea)$/i,
-        isSubmit, bypassSubmit, usrPatt, curEvt, args,
+        isSubmit, bypassSubmit, usrPatt, curEvt,
         // Methods
         setup, validation, validity, checkField, bypassChecks, checkValidity, setCustomValidity, support, pattern, placeholder, range, required, valueMissing, listen, unlisten, preventActions, getTarget, addClass, removeClass, isHostMethod, isSiblingChecked;
 
@@ -42,7 +42,7 @@
             }
         }
 
-        args = settings || opts;
+        form.h5fSettings = settings || opts;
 
         if(isCollection) {
             for(var k=0,len=form.length;k<len;k++) {
@@ -73,7 +73,7 @@
                 preventActions(e);
                 return;
             }
-            args.onSubmit.call(form, e);
+            form.h5fSettings.onSubmit.call(form, e);
         },false);
 
         if(!support()) {
@@ -125,9 +125,12 @@
             events = /^(input|keyup|focusin|focus|change)$/i,
             ignoredTypes = /^(submit|image|button|reset)$/i,
             specialTypes = /^(checkbox|radio)$/i,
-            checkForm = true;
+            checkForm = true,
+            form, args;
 
         if(nodes.test(el.nodeName) && !(ignoredTypes.test(el.type) || ignoredTypes.test(el.nodeName))) {
+            form = el.form;
+            args = form.h5fSettings;
             curEvt = e.type;
 
             if(!support()) {
@@ -150,13 +153,13 @@
             }
             if(curEvt === "input" && checkForm) {
                 // If input is triggered remove the keyup event
-                unlisten(el.form,"keyup",checkField,true);
+                unlisten(form,"keyup",checkField,true);
                 checkForm = false;
             }
         }
     };
     checkValidity = function(el) {
-        var f, ff, isDisabled, isRequired, hasPattern, invalid = false;
+        var f, ff, isDisabled, isRequired, hasPattern, invalid = false, args = el.h5fSettings;
 
         if(el.nodeName.toLowerCase() === "form") {
             f = el.elements;
@@ -170,8 +173,9 @@
 
                 if(ff.nodeName.toLowerCase() !== "fieldset" && !isDisabled && (isRequired || hasPattern && isRequired)) {
                     checkField(ff);
-                    if(!ff.validity.valid && !invalid) {
-                        if(isSubmit) { // If it's not a submit event the field shouldn't be focused
+
+                    if(!ff.validity.valid) {
+                        if (isSubmit && !invalid) { // If it's not a submit event the field shouldn't be focused
                             ff.focus();
                         }
                         invalid = true;
@@ -232,7 +236,8 @@
             focus = /^(focus|focusin|submit)$/i,
             node = /^(input|textarea)$/i,
             ignoredType = /^password$/i,
-            isNative = !!("placeholder" in field);
+            isNative = !!("placeholder" in field),
+            args = el.form.h5fSettings;
 
         if(!isNative && node.test(el.nodeName) && !ignoredType.test(el.type)) {
             if(el.value === "" && !focus.test(curEvt)) {
@@ -309,12 +314,27 @@
     preventActions = function (evt) {
         evt = evt || window.event;
 
-        if(evt.stopPropagation && evt.preventDefault) {
-            evt.stopPropagation();
+        // If preventDefault exists, run it on the original event
+        if (evt.preventDefault) {
             evt.preventDefault();
+        // Support: IE
+        // Otherwise set the returnValue property of the original event to false
         } else {
-            evt.cancelBubble = true;
             evt.returnValue = false;
+        }
+
+        if (evt.stopImmediatePropagation) {
+            // Do not allow other submit handlers to execute
+            evt.stopImmediatePropagation();
+        } else {
+            // If stopPropagation exists, run it on the original event
+            if (evt.stopPropagation) {
+                evt.stopPropagation();
+            // Support: IE
+            // Set the cancelBubble property of the original event to true
+            } else {
+                evt.cancelBubble = true;
+            }
         }
     };
     getTarget = function (evt) {
@@ -362,7 +382,8 @@
 
     // Since all methods are only used internally no need to expose globally
     return {
-        setup: setup
+        setup: setup,
+        support: support
     };
 
 }));
